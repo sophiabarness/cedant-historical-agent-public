@@ -1,0 +1,56 @@
+# Environment files
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Lock files (keep uv.lock for reproducible builds)
+# uv.lock
+
+# Tutorial and examples (if you don't want them)
+tutorial-temporal-ai-agent/
+
+# Kiro IDE files
+.kiro/
+
+# Python version file (optional, depends on your preference)
+.python-version
+
+# Documentation that was auto-generated
+CONFIGURATION.md
+
+# Data
+data/
+validation/
+docs/old-docs/
