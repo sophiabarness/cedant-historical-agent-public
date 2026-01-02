@@ -54,3 +54,6 @@ CONFIGURATION.md
 data/
 validation/
 docs/old-docs/
+
+# Backup files
+.*\.bkp
