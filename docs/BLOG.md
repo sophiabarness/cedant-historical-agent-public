@@ -1,5 +1,7 @@
 # Trusting AI Agents: A Reinsurance Case Study
 
+Demo: https://youtu.be/JeAwrzZC6TI?si=RQg9cHW7qJeATZBi
+
 AI agents can automate tedious tasks such as manual data processing, but they are inherently non-deterministic and fallible. In the reinsurance industry, where data drives risk modeling and premium pricing, mistakes can have serious financial consequences. The more tools, agents, and multi-step decision making involved, the greater the chance of error. 
 
 In this blog post, I share how I built a multi-agent system with human-in-the-loop safeguards to ensure accurate execution in the reinsurance domain.  
@@ -12,7 +14,7 @@ A single hurricane could bankrupt a home insurance company. To protect themselve
 
 Reinsurers have the challenge of taking claims data from cedants, modeling it to determine its risk, and pricing premiums. Claims data from cedants typically comes in the form of Excel submission packs that have no standardized format. 
 
-Underwriters at my partner reinsurance company manually extract catastrophe loss events such as hurricanes or wildfires and loss amounts from Excel submission packs provided (typically ranging from 10-100 events), manually link each loss event to an internal historical database and use this information to populate their internal cedant loss database. The cedant loss database is used by models to determine risk and price premiums. The process of extracting the data, linking, and populating the cedant loss database is manual, error-prone, and time consuming. This led me to create the following multi-agent AI system to accelerate the data population process.
+Underwriters at my partner reinsurance company manually extract catastrophe loss events such as hurricanes or wildfires and loss amounts from Excel submission packs provided (typically ranging from 10-100 events), manually link each loss event to an internal historical database and use this information to populate their internal cedant loss database. The process of extracting the data, linking, and populating the cedant loss database is manual, error-prone, and time consuming. This led me to create the following multi-agent AI system to accelerate the data population process.
 
 ### Agents and Tools
 
@@ -30,7 +32,7 @@ Extracting catastrophe loss data from a generic Excel submission pack is itself 
 - **Locate Submission Pack:** Given an ID, locates the file name of the submission pack
 - **Extract As Of Year:** Extracts the year from the submission pack for the Cedant Loss Data table
 - **Sheet Identifier Agent:** Identifies the relevant catastrophe sheet in the Excel file
-- **Extract Catastrophe Data:** Extracts all catastrophe events, including the year, event name, and loss, from the identified sheet using LLM parsing.
+- **Extract Catastrophe Data:** Extracts all catastrophe events, including the year, event name, and loss, from the identified sheet using LLM parsing. 
 
 The sheet identification step is non-trivial due to the variety of different submission pack formats and the number of sheets (typically at least 15). So, I made a dedicated Sheet Identification agent for this goal. This agent has two tools: **Get Sheet Names** and **Read Sheet**. The agent's prompting guides it to use the Get Sheet Names tool to first find the sheet names and then use the Read Sheet tool to retrieve the contents of potential sheets or the table of contents sheet. Once it succeeds and receives user confirmation, it passes relevant sheet names back to the submission pack parser agent. 
 
@@ -52,7 +54,7 @@ Breaking the process into **multiple modular agents** ensures that each agent fo
 
 ### Implementing an agent with human in the loop
 
-I implemented each agent as a **Temporal workflow**. Each agent had its own `AgentGoal`configuration specifying tools, description, starter prompt, and example conversation history:
+Each agent runs a **Temporal workflow** and has its own `AgentGoal`configuration specifying tools, description, starter prompt, and example conversation history:
 
 ```
 @dataclass
@@ -64,7 +66,7 @@ class AgentGoal:
     example_conversation_history: str
 ```
 
-Each agent runs a loop where it calls the LLM with a prompt containing the `AgentGoal`, past conversation history, any user prompt, and the tool completion prompt (if a tool just finished executing). At each iteration, the LLM decides whether to finish the workflow, execute a tool, or request human input.
+Agents run a loop where they call the LLM with a prompt containing the `AgentGoal`, past conversation history, any user prompt, and the tool completion prompt (if a tool just finished executing). At each iteration, the LLM decides if it want to execute a tool, if it's ready for agent completion, or whether it needs to request human input.
 
 ![Implementation HITL](implementation-HITL.png)
 
@@ -76,15 +78,15 @@ This **human in the loop functionality** ensures that the agent can achieve its 
 
 To support multiple agents, each agent creates its own instance of the Agent Goal Workflow with its own `AgentGoal`. Each Agent Goal Workflow tracks its parent agent (to return to on completion) and pending child agents. 
 
-To allow humans to interact with any sub-agent (not just the supervisor agent), I added a **Bridge Workflow.** The Bridge aggregates messages from all the agents for the frontend. It also keeps track of which agent is currently active, and routes user prompts, tool confirmations, workflow completions, and cancellations to the active agent. Referencing the diagram, the Bridge Workflow will switch out the current Agent Workflow to the one that the user is interacting with to ensure user interatctions are getting routed to the correct active agent. Hence, the Current Agent Goal Workflow in the diagram, depending on the current state, will switch between the Supervisor Agent Workflow, the Submission Pack Parser Agent Workflow, and the Sheet Identifier Agent Workflow, which are all instances of the Agent Goal Workflow class.
+To allow humans to interact with any sub-agent (not just the supervisor agent), I added a **Bridge Workflow.** The Bridge aggregates messages from all the agents for the frontend. It also keeps track of which agent is currently active, and routes user prompts, tool confirmations, workflow completions, and cancellations to the active agent. Referencing the diagram, the Bridge Workflow will switch out the current Agent Workflow to the one that the user is interacting with to ensure user interatctions are getting routed to the correct active agent. 
 
-The Bridge Workflow also serves as the **inter-agent data store**. When there is data to pass between agents, activities can signal the Bridge Workflow to save their results and and later query it to retrieve them. For example, the Catastrophe Loss Events tool from the Submission Pack Parser agent typically extracts between 10 and 100 events, which is too much data for an LLM’s conversation history. Instead, we save the extracted data to the inter-agent data store and the Historical Matcher and Populate Cedant Data tools query when needed. Temporal Workflows are well-suited for this use case because they can persist inter-agent state reliably over time. Since the data we pass between agents and conversation history is small (less than 2 MB), we can save it in the workflow rather than using a proper external data store. 
+The Bridge Workflow also serves as the **inter-agent data store**. When there is data to pass between agents, activities can signal the Bridge Workflow to save their results and later query it to retrieve them. For example, the Catastrophe Loss Events tool from the Submission Pack Parser agent typically extracts between 10 and 100 events, which is too much data for an LLM’s conversation history. Instead, we save the extracted data to the inter-agent data store and the Historical Matcher and Populate Cedant Data tools query when needed. Temporal Workflows are well-suited for this use case because they can persist inter-agent state reliably over time. Since the data we pass between agents and conversation history is small (less than 2 MB), we can save it in the workflow rather than using a proper external data store. 
 
 ### Principles for building AI Agents
 
 Here are some important design principles I discovered while building this system: 
 
-(1) **Design for human-in-the-loop**. Agents can make mistakes. Providing human input and confirmation helps ensure the agent stays on track. In this architecture, the core purpose of the Bridge Workflow is to route human-in-the-loop interactions to the appropriate sub-agents. 
+(1) **Design for human-in-the-loop**. Agents can make mistakes. Providing human input and confirmation at core stages helps ensure the agent stays on track. In this architecture, the core purpose of the Bridge Workflow is to route human-in-the-loop interactions to the appropriate sub-agents. 
 
 (2) **Use modular subagents**. Subagents keep the LLM focused on a specific task and separate relevant context. Temporal Workflow state can be used to pass data between agents and store agent-specific information such as conversation history. 
 
@@ -95,10 +97,8 @@ Here are some important design principles I discovered while building this syste
 
 ### Conclusion
 
-Temporal’s durable execution allowed the agents to operate reliably. Workflows and activities make it straightforward to implement agent logic and tool execution, while automatic retries ensure the system continues operating in face of tool failure. Signals and queries make human-in-the-loop and inter-agent communication simple. Temporal’s UI observability makes every agent action, signal, and update visible in the workflow history. 
+Temporal’s durable execution allows agents to operate reliably. Workflows and activities make it straightforward to implement agent logic and tool execution, while automatic retries ensure the system continues operating in face of tool failure. Signals and queries make human-in-the-loop and inter-agent communication simple. Temporal’s UI observability makes every agent action, signal, and update visible in the workflow history. 
 
-While this proof-of-concept project focused on a reinsurance use case, the underlying design principles apply more broadly for other multi-agent applications requiring careful human supervision. 
+While this proof-of-concept project focused on a reinsurance use case, the underlying design principles apply more broadly for other multi-agent applications requiring careful human supervision.  
 
-Here is a demo video. 
-
-You can dive into the code on GitHub.
+You can dive into the code on GitHub: https://github.com/sophiabarness/cedant-historical-agent-public
