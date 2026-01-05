@@ -2,7 +2,7 @@
 
 Demo: https://youtu.be/JeAwrzZC6TI?si=RQg9cHW7qJeATZBi
 
-AI agents can automate tedious tasks such as manual data processing, but they are inherently non-deterministic and fallible. In the reinsurance industry, where data drives risk modeling and premium pricing, mistakes can have serious financial consequences. The more tools, agents, and multi-step decision making involved, the greater the chance of error. 
+AI agents can automate tedious tasks such as manual data processing, but they are inherently non-deterministic and fallible. In the reinsurance industry, where data drives risk modeling and premium pricing, mistakes have serious financial consequences. The more tools, agents, and multi-step decision making involved, the greater the chance of error. 
 
 In this blog post, I share how I built a multi-agent system with human-in-the-loop safeguards to ensure accurate execution in the reinsurance domain.  
 
