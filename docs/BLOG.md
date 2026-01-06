@@ -14,7 +14,7 @@ A single hurricane could bankrupt a home insurance company. To protect from such
 
 Reinsurers have the challenge of ingesting claims data from cedants, modeling it to determine its risk, and pricing premiums. Claims data from cedants typically comes in the form of Excel submission packs that have no standardized format. 
 
-Underwriters at my partner reinsurance company manually extract catastrophe loss events such as hurricanes or wildfires and loss amounts from cedant submission packs, manually link each loss event to an internal historical database and use this information to populate their internal cedant loss database. The process of extracting the data, linking, and populating the cedant loss database is manual, error-prone, and time consuming. This led me to create the following multi-agent AI system to accelerate the data population process.
+Underwriters at my partner reinsurance company manually extract catastrophe loss data from cedant submission packs, link each loss event to an internal historical database, and use this information to populate their internal cedant loss database. The process of extracting the data, linking, and populating the final database is manual and time consuming. This led me to create the following multi-agent AI system to accelerate the data population process.
 
 ### Agents and Tools
 
@@ -22,29 +22,29 @@ Underwriters at my partner reinsurance company manually extract catastrophe loss
 
 At its core, the system converts messy Excel submission pack data into clean, structured catastrophe records. The process breaks down into four steps:  
 
-- **Submission Pack Parser Agent:** Extracts catastrophe loss data (year, event name, loss amount) for each event from the Excel submission pack.
+- **Submission Pack Parser Agent:** Extracts catastrophe loss data from the Excel submission pack.
 - **Historical Matcher:** Matches each catastrophe event to the corresponding historical event, if one exists. This tool spawns parallel child workflows which use fuzzy matching to check if there is a corresponding match.
-- **Populate Cedant Data:** Creates cedant loss data records using the catastrophe loss data from the submission pack parser and historical matches.
-- **Compare to Existing Cedant Data:** Identifies updates and additions compared to existing data from previous years.
+- **Populate Cedant Data:** Creates cedant loss data records using the data from the submission pack parser and historical matches.
+- **Compare to Existing Cedant Data:** Flags new records and changes compared to existing data.
 
-Extracting catastrophe loss data from an Excel submission pack is itself a multi-step process. To handle this, I built the Submission Pack Parser agent which orchestrates the following tools:
+Extracting catastrophe loss data from an Excel submission pack is itself a multi-step process. The Submission Pack Parser agent orchestrates the following tools:
 
 - **Locate Submission Pack:** Given an ID, locates the file name of the submission pack.
 - **Extract As Of Year:** Extracts the year the submission pack was last updated.
 - **Sheet Identifier Agent:** Identifies the relevant catastrophe sheet in the Excel file.
-- **Extract Catastrophe Data:** Extracts all catastrophe events, including the year, event name, and loss, from the identified sheet using LLM parsing. 
+- **Extract Catastrophe Data:** Extracts all catastrophe events, including the year, event name, and loss amount, from the identified sheet using LLM parsing. 
 
-Sheet identification is non-trivial due to the large number of sheets in each workbook and the variability in submission pack formats. To accomplish this task, I made the Sheet Identifier agent, which has two tools: **Get Sheet Names** and **Read Sheet**. The agent’s prompting guides it to reason over sheet names first and selectively use the Read Sheet tool to inspect candidate sheets or a table-of-contents sheet when needed. Once it succeeds and receives user confirmation, it passes relevant sheet names back to the submission pack parser agent. 
+Sheet identification is non-trivial due to the large number of sheets in each workbook and the variability in submission pack formats. The Sheet Identifier agent handles this task with two tools: **Get Sheet Names** and **Read Sheet**. Prompting guides the agent to check sheet names first, look for a table of contents, and inspect candidate sheets as needed. Once it succeeds and receives user confirmation, it passes the relevant sheet names back to the submission pack parser agent. 
 
-In this architecture, we have two types of tools: **standard tools** and **agents-as-tools**. Standard tools, implemented via Temporal Activities, execute well-defined actions via code. Agents-as-tools, each with their own set of tools, start their own agent workflow that uses an LLM to determine the next tool execution. In this application, the LLM is used in two places: (1) to determine the next tool call in the agentic loop, (2) to extract catastrophe events from the identified sheets in the submission pack. 
+In this architecture, we have two types of tools: **standard tools** and **agents-as-tools**. Standard tools, implemented via Temporal Activities, execute well-defined actions via code. Agents-as-tools, each with their own set of tools, start a separate agent workflow that uses an LLM to determine the next tool execution. In this application, the LLM is used in two places: (1) to determine the next action in the agentic loop, (2) to extract catastrophe events from the identified sheets in the submission pack. 
 
 ### Why Agentic AI?
 
 The process described above might seem rigid, which raises the question: why use AI agents instead of a fixed workflow? 
 
-The simple answer is: flexibility. For example, in the Sheet Identification agent, every submission pack requires a different tool execution order. For some packs, reading sheet names is enough to identify the catastrophe sheet. For others, the agent must first read the table of contents, or inspect candidate sheets to verify which contains the actual data. Some packs have no table of contents. Some split catastrophe data across multiple sheets. Hard-coding all the possible execution paths quickly becomes hard to maintain. 
+The simple answer is: flexibility. For example, in the Sheet Identifier agent, every submission pack requires a different tool execution order. For some packs, reading sheet names is enough to identify the catastrophe sheet. For others, the agent must first read the table of contents or inspect candidate sheets to verify which contains the actual data. Some packs have no table of contents. Some split catastrophe data across multiple sheets. Hard-coding all the possible execution paths becomes unmaintainable. 
 
-An agentic AI-based system allows the agent to decide the next step based on its context: previous tool results, prompting, and user interaction. It can also re-execute a tool if needed. Choosing the next step dynamically, rather than following a fixed order, lets the system adapt to new submission packs and incorporate human context into decision-making. It also enables graceful recovery. If a tool fails or returns ambiguous results, the agent can reason about the error and proactively ask the user for guidance rather than  crashing.
+An agentic AI-based system allows the agent to decide the next step based on its context: previous tool results, prompting, and user interaction. It can also re-execute a tool if needed. Choosing the next step dynamically, rather than following a fixed order, lets the system adapt to new submission packs and incorporate human context into its decision-making. It also enables graceful recovery. If a tool fails or returns ambiguous results, the agent can reason about the error and proactively ask the user for guidance rather than crashing.
 
 ### Why Multiple Agents?
 
@@ -56,7 +56,7 @@ This architecture requires coordinating multiple agents that can pause for human
 
 ### Implementing an agent with human in the loop
 
-We implement the agents using Temporal. Each agent runs as a **Temporal workflow**, with LLM calls and tool executions handled via **Temporal activities**.
+We implement the agents using Temporal. Each agent runs as a **Temporal Workflow**, with LLM calls and tool executions handled via **Temporal Activities**.
 
 Each agent is configured with an `AgentGoal` specifying its tools, description, starter prompt, and example conversation history:
 
@@ -74,7 +74,7 @@ Agents run a loop where they call the LLM with a prompt containing the `AgentGoa
 
 ![Implementation HITL](implementation-HITL.png)
 
-To prevent the agent from spiraling or making mistakes, a human confirms or cancels **each tool execution and agent completion**. The human can also intervene at any point with direct input. This is implemented using **Temporal signals**: when a user confirms a tool execution or agent completion, a signal is sent to the Agent Workflow, and the agentic loop blocks until it receives user confirmation. When a user intervenes with a prompt, the agentic loop processes the prompt to determine the next best action. 
+To prevent the agent from spiraling or making mistakes, a human confirms or cancels **each tool execution and agent completion**. The human can also intervene at any point with direct input. This is implemented using **Temporal signals**: when a user confirms a tool execution or agent completion, a signal is sent to the Agent Workflow, and the agentic loop blocks until it receives confirmation. When a user intervenes with a prompt, the agentic loop processes the prompt to determine the next best action. As an example, the Extract Catastrophe Losses tool takes `user_input` as a direct argument. The tool's LLM call incorporates this user input in case more context is needed beyond the default prompt to extract the data.
 
 ### Multiple agents with human in the loop
 
@@ -82,7 +82,7 @@ To support multiple agents, each agent creates its own instance of the Agent Goa
 
 The **Bridge Workflow** ties all the agents together by acting as a central router. It keeps track of which agent is currently active, and routes user prompts, tool confirmations, workflow completions, and cancellations to the active agent. When we switch to a new agent, the Bridge Workflow updates its references to point to the new Agent Workflow to ensure user interactions get routed to the correct active agent. 
 
-The Bridge Workflow also serves as the **inter-agent data store**. When there is data to pass between agents, activities signal the Bridge Workflow to save their results and later query it to retrieve them. For example, the Extract Catastrophe Data tool from the Submission Pack Parser agent typically extracts between 10 and 100 events, which is too much data for an LLM’s conversation history. Instead, we save the extracted data to the inter-agent data store and the Historical Matcher and Populate Cedant Data tools query when needed. Temporal Workflows are well-suited for this use case because they persist inter-agent state reliably over time. Since the data we pass between agents and the conversation histories are small (less than 2 MB), we save it in the workflow rather than using an external data store. 
+The Bridge Workflow also serves as the **inter-agent data store**. When there is data to pass between agents, activities signal the Bridge Workflow to save their results and later query it to retrieve them. For example, the Extract Catastrophe Data tool from the Submission Pack Parser agent typically extracts between 10 and 100 events, which is too much data for an LLM’s conversation history. Instead, we save the extracted data to the inter-agent data store and the Historical Matcher and Populate Cedant Data tools query when needed. Temporal Workflows are well-suited for this use case because they persist inter-agent state reliably over time. Since the data we pass between agents and the conversation histories is small (less than 2 MB), we save it in the workflow rather than using an external data store. 
 
 ### Principles for building AI Agents
 
@@ -92,13 +92,13 @@ Here are some design principles I discovered while building this system:
 
 (2) **Use modular subagents**. Subagents keep the LLM focused on a specific task and separate relevant context. 
 
-(3) **Keep tool arguments simple**. More options confuse the LLM. As an example, my original ReadSheet tool provided an argument for the LLM to choose how many rows to read. I simplified it to two options to make it more performant: a preview (first 20 rows) or full (entire sheet). 
+(3) **Keep tool arguments simple**. More options confuse the LLM. As an example, my original ReadSheet tool provided an argument for the LLM to choose how many rows to read. I simplified it to two options to make it more performant: a preview mode (first 20 rows) or full mode (entire sheet). 
 
 ### Conclusion
 
 Temporal’s durable execution allows agents to operate reliably. Workflows and activities make it straightforward to implement agent logic and tool execution. Automatic retries ensure the system continues operating in face of LLM call or tool failure. Signals and queries make human-in-the-loop and inter-agent communication simple. Temporal’s UI observability makes every agent action, signal, and update visible in the workflow history. 
 
-The foundation of trust in this system comes from the human-in-the-loop functionality. By allowing the user to interject at any point, the user retains control over the agent's execution. User confirmation for tool calls and agent completions ensures the user knows what the agent will do ahead of time. With human-in-the-loop, the system shifts from a black-box executing autonomously to a supervised assistant. 
+The foundation of trust in this system comes from the human-in-the-loop functionality. By allowing the user to interject and influence how tools are executed, the user retains control over the agent. User confirmation for tool calls and agent completions ensures the user knows what the agent will do ahead of time. With human-in-the-loop, the system shifts from a black-box executing autonomously into a supervised assistant. 
 
 While this proof-of-concept project focused on a reinsurance use case, the underlying design principles apply more broadly for other multi-agent applications requiring careful human supervision.  
 
