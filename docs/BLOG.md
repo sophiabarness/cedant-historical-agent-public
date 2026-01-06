@@ -34,7 +34,7 @@ Extracting catastrophe loss data from an Excel submission pack is itself a multi
 - **Sheet Identifier Agent:** Identifies the relevant catastrophe sheet in the Excel file.
 - **Extract Catastrophe Data:** Extracts all catastrophe events, including the year, event name, and loss amount, from the identified sheet using LLM parsing. 
 
-Sheet identification is non-trivial due to the large number of sheets in each workbook and the variability in submission pack formats. The Sheet Identifier agent handles this task with two tools: **Get Sheet Names** and **Read Sheet**. Prompting guides the agent to check sheet names first, look for a table of contents, and inspect candidate sheets as needed. Once it succeeds and receives user confirmation, it passes the relevant sheet names back to the submission pack parser agent. 
+Sheet identification is non-trivial due to the large number of sheets in each workbook and the variability in submission pack formats. The Sheet Identifier agent handles this task with two tools: **Get Sheet Names** and **Read Sheet**. Prompting guides the agent to check sheet names first, look for a table of contents, and inspect candidate sheets as needed. Once it succeeds and receives user confirmation, it passes the relevant sheet names back to the Submission Pack Parser agent. 
 
 In this architecture, we have two types of tools: **standard tools** and **agents-as-tools**. Standard tools, implemented via Temporal Activities, execute well-defined actions via code. Agents-as-tools, each with their own set of tools, start a separate agent workflow that uses an LLM to determine the next tool execution. In this application, the LLM is used in two places: (1) to determine the next action in the agentic loop, (2) to extract catastrophe events from the identified sheets in the submission pack. 
 
@@ -54,7 +54,7 @@ Breaking the process into **multiple modular agents** ensures that each agent fo
 
 This architecture requires coordinating multiple agents that can pause for human input, pass data between each other, and recover gracefully from failures. With this design in mind, let's look at how to implement the system. 
 
-### Implementing an agent with human in the loop
+### Implementing an Agent with Human-in-the-Loop
 
 We implement the agents using Temporal. Each agent runs as a **Temporal Workflow**, with LLM calls and tool executions handled via **Temporal Activities**.
 
@@ -74,9 +74,9 @@ Agents run a loop where they call the LLM with a prompt containing the `AgentGoa
 
 ![Implementation HITL](implementation-HITL.png)
 
-To prevent the agent from spiraling or making mistakes, a human confirms or cancels **each tool execution and agent completion**. The human can also intervene at any point with direct input. This is implemented using **Temporal signals**: when a user confirms a tool execution or agent completion, a signal is sent to the Agent Workflow, and the agentic loop blocks until it receives confirmation. When a user intervenes with a prompt, the agentic loop processes the prompt to determine the next best action. As an example, the Extract Catastrophe Losses tool takes `user_input` as a direct argument. The tool's LLM call incorporates this user input in case more context is needed beyond the default prompt to extract the data.
+To prevent the agent from spiraling or making mistakes, a human confirms or cancels **each tool execution and agent completion**. The human can also intervene at any point with direct input. This is implemented using **Temporal signals**: when a user confirms a tool execution or agent completion, a signal is sent to the Agent Workflow, and the agentic loop blocks until it receives confirmation. When a user intervenes with a prompt, the agentic loop processes the prompt to determine the next best action. As an example, the Extract Catastrophe Data tool takes `user_input` as a direct argument. The tool's LLM call incorporates this user input in case more context is needed beyond the default prompt to extract the data.
 
-### Multiple agents with human in the loop
+### Multiple Agents with Human-in-the-Loop
 
 To support multiple agents, each agent creates its own instance of the Agent Goal Workflow with its own `AgentGoal`.
 
@@ -84,7 +84,7 @@ The **Bridge Workflow** ties all the agents together by acting as a central rout
 
 The Bridge Workflow also serves as the **inter-agent data store**. When there is data to pass between agents, activities signal the Bridge Workflow to save their results and later query it to retrieve them. For example, the Extract Catastrophe Data tool from the Submission Pack Parser agent typically extracts between 10 and 100 events, which is too much data for an LLM’s conversation history. Instead, we save the extracted data to the inter-agent data store and the Historical Matcher and Populate Cedant Data tools query when needed. Temporal Workflows are well-suited for this use case because they persist inter-agent state reliably over time. Since the data we pass between agents and the conversation histories is small (less than 2 MB), we save it in the workflow rather than using an external data store. 
 
-### Principles for building AI Agents
+### Principles for Building AI Agents
 
 Here are some design principles I discovered while building this system: 
 
