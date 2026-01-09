@@ -1,6 +1,6 @@
 # Trusting AI Agents: A Reinsurance Case Study
 
-Demo: https://youtu.be/JeAwrzZC6TI?si=RQg9cHW7qJeATZBi
+Demo: https://youtu.be/NkQ8bA3AcAQ?si=Mbz7bhkbJX3Go6A2
 
 AI agents have the potential to automate tedious tasks such as manual data processing, but they are inherently non-deterministic and fallible. In the reinsurance industry, where data drives risk modeling and premium pricing, mistakes can have serious financial consequences. The more tools, agents, and multi-step decision making involved, the greater the chance of error. 
 
