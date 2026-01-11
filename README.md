@@ -13,11 +13,11 @@ See demo video: https://youtu.be/NkQ8bA3AcAQ?si=Mbz7bhkbJX3Go6A2
 |-------------|--------------------------------------------------------------------|
 | `frontend`  | React-based UI for interacting with the agent                      |
 | `api`       | FastAPI server that interfaces between the UI and Temporal workflows |
-| `agents`    | Core agent logic, prompts, and supervisor workflow definitions     |
+| `agents`    | Core agent logic, prompts, and tools     |
 | `worker`    | Temporal worker that executes workflows and activities             |
 | `shared`    | Shared configuration and bridge workflow utilities                 |
 | `models`    | Pydantic models for requests and data structures                   |
-| `data`      | data files (cedant loss data, historical events, submission packs)  |
+| `data`      | Data files (cedant loss data, historical events, submission packs)  |
 
 ## Running the Application
 
