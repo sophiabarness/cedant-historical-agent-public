@@ -58,7 +58,7 @@ This architecture requires coordinating multiple agents that can pause for human
 
 ### Implementing an Agent with Human-in-the-Loop
 
-We implement the agents using Temporal. Each agent runs as a **Temporal Workflow**, with LLM calls and tool executions handled via **Temporal Activities**.
+We implement the agents using Temporal. Each agent runs as a [**Temporal Workflow**](https://docs.temporal.io/workflows), with LLM calls and tool executions handled via [**Temporal Activities**](https://docs.temporal.io/activities).
 
 Each agent is configured with an `AgentGoal` specifying its tools, description, starter prompt, and example conversation history:
 
